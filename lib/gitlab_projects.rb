@@ -40,6 +40,7 @@ class GitlabProjects
     when 'rm-project';  rm_project
     when 'mv-project';  mv_project
     when 'import-project'; import_project
+    when 'opy-project'; copy_project
     when 'fork-project'; fork_project
     when 'update-head';  update_head
     else
@@ -152,6 +153,43 @@ class GitlabProjects
 
     $logger.info "Moving project #{@project_name} from <#{full_path}> to <#{new_full_path}>."
     FileUtils.mv(full_path, new_full_path)
+  end
+
+  def copy_project
+
+    new_namespace = ARGV.shift
+    new_project_name = ARGV.shift
+
+    # destination namespace must be provided
+    unless new_namespace
+      $logger.error "copy-project failed: no destination namespace provided."
+      return false
+    end
+
+    # destination project name must be provided
+    unless new_project_name
+      $logger.error "copy-project failed: no project name provided."
+      return false
+    end
+
+    # destination namespace must exist
+    namespaced_path = File.join(repos_path, new_namespace)
+    unless File.exists?(namespaced_path)
+      $logger.error "copy-project failed: destination namespace <#{namespaced_path}> does not exist."
+      return false
+    end
+
+    full_destination_path = File.join(namespaced_path, new_project_name.split('/')[-1])
+    ## a project of the same name cannot already be within the destination namespace
+    #if File.exists?(full_destination_path)
+    #  $logger.error "copy-project failed: destination repository <#{full_destination_path}> already exists."
+    #  return false
+    #end
+
+    $logger.info "Copying project from <#{full_path}> to <#{full_destination_path}>."
+    cmd = %W(git clone --bare -- #{full_path} #{full_destination_path})
+    system(*cmd) && create_hooks(full_destination_path)
+
   end
 
   def fork_project
