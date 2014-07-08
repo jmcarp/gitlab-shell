@@ -6,7 +6,7 @@ require_relative 'gitlab_config'
 require_relative 'gitlab_logger'
 
 class GitlabNet
-  def allowed?(cmd, repo, actor, ref, oldrev = nil, newrev = nil)
+  def allowed?(cmd, repo, actor, ref, oldrev = nil, newrev = nil, forced_push = false)
     project_name = repo.gsub("'", "")
     project_name = project_name.gsub(/\.git\Z/, "")
     project_name = project_name.gsub(/\A\//, "")
@@ -15,6 +15,7 @@ class GitlabNet
       action: cmd,
       ref: ref,
       project: project_name,
+      forced_push: forced_push,
     }
 
     params.merge!(oldrev: oldrev) if oldrev
@@ -52,27 +53,30 @@ class GitlabNet
     "#{config.gitlab_url}/api/v3/internal"
   end
 
+  def http_client_for(url)
+    Net::HTTP.new(url.host, url.port).tap do |http|
+      if URI::HTTPS === url
+        http.use_ssl = true
+        http.cert_store = cert_store
+        http.verify_mode = OpenSSL::SSL::VERIFY_NONE if config.http_settings['self_signed_cert']
+      end
+    end
+  end
+
+  def http_request_for(url)
+    user = config.http_settings['user']
+    password = config.http_settings['password']
+    Net::HTTP::Get.new(url.request_uri).tap { |r| r.basic_auth(user, password) if user && password }
+  end
+
   def get(url)
     $logger.debug "Performing GET #{url}"
 
     url = URI.parse(url)
-    http = Net::HTTP.new(url.host, url.port)
+    http = http_client_for url
+    request = http_request_for url
 
-    if URI::HTTPS === url
-      http.use_ssl = true
-      http.cert_store = cert_store
-
-      if config.http_settings['self_signed_cert']
-        http.verify_mode = OpenSSL::SSL::VERIFY_NONE
-      end
-    end
-
-    request = Net::HTTP::Get.new(url.request_uri)
-    if config.http_settings['user'] && config.http_settings['password']
-      request.basic_auth config.http_settings['user'], config.http_settings['password']
-    end
-
-    http.start {|http| http.request(request) }.tap do |resp|
+    http.start { |http| http.request(request) }.tap do |resp|
       if resp.code == "200"
         $logger.debug { "Received response #{resp.code} => <#{resp.body}>." }
       else
