@@ -40,7 +40,7 @@ class GitlabProjects
     when 'rm-project';  rm_project
     when 'mv-project';  mv_project
     when 'import-project'; import_project
-    when 'opy-project'; copy_project
+    when 'copy-project'; copy_project
     when 'fork-project'; fork_project
     when 'update-head';  update_head
     else
@@ -188,7 +188,7 @@ class GitlabProjects
 
     $logger.info "Copying project from <#{full_path}> to <#{full_destination_path}>."
     cmd = %W(git clone --bare -- #{full_path} #{full_destination_path})
-    system(*cmd) && create_hooks(full_destination_path)
+    system(*cmd) && self.class.create_hooks(full_destination_path)
 
   end
 
