@@ -1,4 +1,5 @@
-#!/usr/bin/env ruby
+#!/usr/local/bin/ruby
+# Temporary fix until https://github.com/gitlabhq/gitlabhq/issues/7246 is resolved
 
 # This file was placed here by GitLab. It makes sure that your pushed commits
 # will be processed properly.
